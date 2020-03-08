@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>HAR File Analyser</title>
+        <style>
+            body {              
+                margin: 0 auto;
+                margin-left:5px;
+                font-family: Tahoma, Verdana, Arial, sans-serif;
+                font-size:8pt;
+            }
+            #list {
+                max-height:400px;
+                overflow-y:scroll;
+
+            }
+            #list table {
+                width:100%;
+            }
+            #list table thead {
+                font-weight:bold;
+            }
+            #list table tbody td:nth-child(2) {
+                width:30%;
+                word-break: break-all;
+            }
+            #list table tbody .even {
+                background-color: silver;
+            }
+            .request-totals {
+                font-size:larger;
+                margin-top:10px;
+                font-weight:bold;
+            }
+            .request-totals span {
+                width:30%;
+                float:left;
+                font-size:large;
+            }
+
+            .total div {
+                float:left;
+            }
+
+            .text-value {
+                clear:left;
+                width:20%;
+            }
+
+        </style>
+    </head>
+    <body>
+        <h1>HAR File Analyser</h1>
+        <p>
+            Use HTTP ARchive format from your web browser to find bottlenecks on your web site
+        </p>
+        <form >
+            <input type="file" id="file" name="file" multiple />
+            <div id="list">
+                <table>
+                    <thead>
+
+                    </thead>
+                    <tbody>
+
+                    </tbody>                    
+                </table>
+            </div>
+        </form>
+        <div class="request-totals" style="display:none">
+            <span>Total Size</span><span>{tsize}</span>
+            <div class="total">
+                <div class="text-value">
+                    HTML
+                </div>
+                <div class="size-total">
+                    {html}
+                </div>
+                <div class="text-value">
+                    Images
+                </div>
+                <div class="size-total">
+                    {images}
+                </div>
+                <div class="text-value">
+                    Style Sheets
+                </div>
+                <div class="size-total">
+                    {css}
+                </div>
+                <div class="text-value">
+                    Javascript
+                </div>
+                <div class="size-total">
+                    {jscript}
+                </div>
+                <div class="text-value">
+                    Fonts
+                </div>
+                <div class="size-total">
+                    {fonts}
+                </div>
+                <div class="text-value">
+                    Other
+                </div>
+                <div class="size-total">
+                    {other}
+                </div>
+            </div>
+        </div>
+        <script>
+            (function (d) {
+
+                d.addEventListener("DOMContentLoaded", function () {
+                    oOutput.totals = d.querySelector('.request-totals').innerHTML;
+                    d.getElementById("file").onchange = function () {
+                        var reader = new FileReader(), file = this.files[0];
+                        d.querySelector('.request-totals').style.display = 'none';
+                        reader.onprocess = function () {
+
+                        };
+                        reader.onload = function () {
+                            var fileContent = this.result, request = new XMLHttpRequest();
+                            request.open("POST", "/upload.php");
+                            request.setRequestHeader('Content-Type', 'application/json');
+                            request.setRequestHeader('cache-control', 'no-cache, must-revalidate, post-check=0, pre-check=0');
+                            request.setRequestHeader('cache-control', 'max-age=0');
+                            request.setRequestHeader('expires', '0');
+                            request.setRequestHeader('expires', 'Tue, 01 Jan 1980 1:00:00 GMT');
+                            request.setRequestHeader('pragma', 'no-cache');
+                            request.responseType = 'json';
+                            request.onprogress = function () {
+
+                            };
+                            request.onload = function () {
+                                d.getElementById('file').value = '';
+                                if (request.status != 200) { // analyze HTTP status of the response
+                                    alert(`Error ${request.status}: ${request.statusText}`); // e.g. 404: Not Found
+                                } else {
+                                    d.querySelector('#list table thead').innerHTML = '<tr>' + oOutput.requestTable.header + '</tr>';
+                                    var html = '', tbody = d.querySelector('#list table tbody');
+                                    var oe = 0;
+                                    for (var i = 0; i < request.response.request.length; i++) {
+                                        var entry = request.response.request[i], htmlData = oOutput.requestTable.body;
+                                        with (entry) {
+                                            html += '<tr class="' + (oe == 0 ? 'even' : 'odd') + '">';
+                                            htmlData = htmlData.replace('{id}', id);
+                                            htmlData = htmlData.replace('{url}', url);
+                                            htmlData = htmlData.replace('{method}', method);
+                                            htmlData = htmlData.replace('{status}', status);
+                                            htmlData = htmlData.replace('{stime}', startTime);
+                                            htmlData = htmlData.replace('{time}', loadTime);
+                                            htmlData = htmlData.replace('{type}', type);
+                                            htmlData = htmlData.replace('{size}', size);
+                                            html += htmlData;
+                                            html += '</tr>';
+                                            oe ^= 1;
+                                        }
+                                    }
+                                    tbody.innerHTML = html;
+                                    html = oOutput.totals;
+                                    with (request.response.totals) {
+                                        html = html.replace('{tsize}', total);
+                                        html = html.replace('{html}', htmlText);
+                                        html = html.replace('{images}', image);
+                                        html = html.replace('{css}', css);
+                                        html = html.replace('{jscript}', jscript);
+                                        html = html.replace('{fonts}', font);
+                                        html = html.replace('{other}', other);
+                                    }
+                                    d.querySelector('.request-totals').innerHTML = html;
+                                    d.querySelector('.request-totals').style.display = 'block';
+                                    try {
+                                        d.querySelector('#list table thead td').removeEventListner('click', function () {
+
+                                        });
+                                    } catch (e) {
+                                    }
+                                    var tds = d.querySelectorAll('#list table thead td');
+                                    for (var i = 0; i < tds.length; i++) {
+                                        switch (tds[i].textContent.trim()) {
+                                            case 'Url':
+                                            case 'Load Time':
+                                                tds[i].style.cursor = 'pointer';
+                                                tds[i].addEventListener('click', function () {
+                                                    tds[i].style.cursor = 'pointer';
+                                                });
+                                                break;
+                                        }
+                                    }
+
+                                    /*
+                                     *    d.querySelector('#list table thead td').addEventListner('click', function () {
+                                     alert(1);
+                                     });
+                                     */
+
+                                }
+                            };
+                            request.send(fileContent);
+                        };
+
+                        reader.readAsText(file, 'application/application/json');
+                    };
+
+
+
+                });
+            })(document);
+            const oOutput = {
+                totals: '',
+                requestTable: {
+                    header: '<td>Request ID</td><td>Url</td><td>Method</td><td>Status</td><td>Start Time</td>\n\
+                            <td>Load Time</td><td>Type</td><td>Size</td>',
+                    body: '<td>{id}</td><td>{url}</td><td>{method}</td><td>{status}</td><td>{stime}</td>\n\
+                         <td>{time}</td><td>{type}</td><td>{size}</td>'
+                }
+            };
+        </script>
+    </body>
+</html>
+
+
+
